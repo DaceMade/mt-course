@@ -22,23 +22,18 @@ public class PriceAggregator {
         List<CompletableFuture<Double>> futures = new ArrayList<>();
         for (Long shopId: shopIds) {
             CompletableFuture<Double> future = CompletableFuture
-                    .supplyAsync(() -> priceRetriever.getPrice(itemId, shopId));
-                    //.completeOnTimeout(Double.NaN,3, TimeUnit.SECONDS);
+                    .supplyAsync(() -> priceRetriever.getPrice(itemId, shopId))
+                    .completeOnTimeout(Double.NaN,2900, TimeUnit.MILLISECONDS);
             futures.add(future);
         }
         List<Double> prices = futures.stream()
                 .map(future -> {
                     try {
-                        return future.get(3, TimeUnit.SECONDS);
-                    } catch (TimeoutException | InterruptedException | ExecutionException e) {
+                        return future.get();
+                    } catch (/*TimeoutException |*/ InterruptedException | ExecutionException e) {
                         return Double.NaN;
                     }
-                })
-                .collect(Collectors.toList());
-        prices.removeIf(x -> x == 0);
-        if (prices.isEmpty()) {
-            return Double.NaN;
-        }
+                }).collect(Collectors.toList());
         return Collections.min(prices);
     }
 }
