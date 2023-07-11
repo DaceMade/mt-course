@@ -20,20 +20,27 @@ public class PriceAggregator {
 
     public double getMinPrice(long itemId) {
         List<CompletableFuture<Double>> futures = new ArrayList<>();
+        ExecutorService executorService = Executors.newCachedThreadPool();
         for (Long shopId: shopIds) {
             CompletableFuture<Double> future = CompletableFuture
-                    .supplyAsync(() -> priceRetriever.getPrice(itemId, shopId))
-                    .completeOnTimeout(Double.NaN,2900, TimeUnit.MILLISECONDS);
+                    .supplyAsync(() -> priceRetriever.getPrice(itemId, shopId), executorService)
+                    .completeOnTimeout(Double.NaN,2900, TimeUnit.MILLISECONDS)
+                    .handle((result, ex) -> {
+                        if (ex != null) {
+                            return Double.NaN;
+                        } else {
+                            return result;
+                        }
+                    });
             futures.add(future);
         }
-        List<Double> prices = futures.stream()
+        return futures.stream()
                 .map(future -> {
                     try {
                         return future.get();
-                    } catch (/*TimeoutException |*/ InterruptedException | ExecutionException e) {
+                    } catch (InterruptedException | ExecutionException e) {
                         return Double.NaN;
                     }
-                }).collect(Collectors.toList());
-        return Collections.min(prices);
+                }).min(Double::compareTo).get();
     }
 }
